@@ -1,6 +1,73 @@
-html, body {
+@import '../../node_modules/bulma/bulma.sass';
+
+html,
+body {
     padding: 0;
     margin: 0;
 }
 
-@import '../../node_modules/bulma/bulma.sass';
+.title {
+    text-align: center;
+}
+
+.square {
+    height: 0;
+    width: 8vw;
+    padding: 4vw 0;
+    // position: relative;
+}
+
+.board {
+    border: 1px dotted red;
+    padding: 10px;
+    background-color: #0a6c03;
+
+    .row {
+        display: flex;
+
+        .cell {
+
+            position: relative;
+            width: 50%;
+            margin: 10px;
+            background-color: #3ab503;
+            border-radius: 7%;
+
+            .cont {
+                // border: 1px solid green;
+
+                border-radius: 1000px;
+                position: absolute;
+                $size: 94%;
+                margin: 3%;
+                width: $size;
+                height: $size;
+
+                text-align: center;
+            }
+
+            &:after {
+                content: "";
+                display: block;
+                padding-bottom: 100%;
+            }
+
+            .state-empty {
+                &:hover {
+                    background-color: gray;
+                    cursor: pointer;
+                }
+            }
+
+            .state-black {
+                background-color: black;
+            }
+
+            .state-white {
+                background-color: white;
+            }
+
+        }
+
+    }
+}
