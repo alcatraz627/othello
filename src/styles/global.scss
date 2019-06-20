@@ -54,14 +54,20 @@ body {
                 content: "";
                 display: block;
                 padding-bottom: 100%;
-                
+
             }
 
             .state-empty.isValidMove {
-                &:hover {
-                    background-color: gray;
+                &.highlight-black:hover {
+                    background-color: #000a;
                     cursor: pointer;
                 }
+
+                &.highlight-white:hover {
+                    background-color: #fffa;
+                    cursor: pointer;
+                }
+
             }
 
             .state-black {

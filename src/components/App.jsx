@@ -79,7 +79,7 @@ const App = () => {
     const isEmptyCoord = ({ x, y }) => (board[y][x] == BOX_STATES.EMPTY) // Is it empty right now
 
     const isValidMove = (pos) => {
-        const { x, y } = pos
+
         // - search in each direction, and 'at least one' should satisfy the following
         // - adjacent cell should have a chip of the opposite color
         // - the next adjacent cell in the same direction should either be :
@@ -87,44 +87,34 @@ const App = () => {
         // 2) A chip of different color, and the search terminates, returning true.
         // 3) If it is either a) a wall, or b) an empty, the search terminates and returns false
 
-        console.log("\n################")
-        console.log("#### BEGIN ####")
-
-        console.log(outputCoord(pos), isValidCoord(pos), isEmptyCoord(pos));
 
         if (isValidCoord(pos) && isEmptyCoord(pos)) {
-            // let validDirections = _.times(Object.keys(DIRECTIONS).length, () => 0)
+
             let validDirections = _.map(DIRECTIONS, (dir, i) => {
 
                 let adj = dir(pos) // computing the adjacent in that direction
+
+                // Check the first adjacent
                 if (isValidCoord(adj)) {
-                    console.log("ADJACENT[0]: ", outputCoord(adj), i)
                     switch (board[adj.y][adj.x]) {
+                        // If either empty or the same color as active player, a move is not possible
                         case activePlayer:
                         case BOX_STATES.EMPTY:
-                            console.log("Nope.");
                             return 0;
 
+                        // If a chip of the opposite color to the active player is present, it, or a series of that 
+                        // colored chips must be followed by a chip of the color of the player for the move to be valid
                         case getOtherPlayer(activePlayer):
                             while (board[adj.y][adj.x] == getOtherPlayer(activePlayer)) {
                                 adj = dir(adj)
-                                console.log("ADJACENT[transit]: ", outputCoord(adj), board[adj.y][adj.x])
                             }
-                            console.log("ADJACENT[final]", outputCoord(adj), board[adj.y][adj.x])
 
-                            console.log((board[adj.y][adj.x] == activePlayer), isValidCoord(adj), !isEmptyCoord(adj))
-
-                            if ((board[adj.y][adj.x] == activePlayer) && isValidCoord(adj) && !isEmptyCoord(adj)) { return 1 }
-                            else return 0;
+                            return ((board[adj.y][adj.x] == activePlayer) && isValidCoord(adj) && !isEmptyCoord(adj)) ? 1 : 0
                     }
                 }
 
             })
 
-            console.log("#### END ####")
-            console.log("################\n")
-            console.log(validDirections, _.sum(validDirections))
-            // return _.includes(validDirections, true)
             return (_.sum(validDirections) > 0)
         }
 
@@ -134,32 +124,46 @@ const App = () => {
 
     const runMove = (pos) => {
 
-        if (isValidCoord(pos) && isEmptyCoord(pos)) {
-            _.map(DIRECTIONS, (dir, i) => {
-                let adj = dir(pos) // computing the adjacent in that direction
-                if (isValidCoord(adj)) {
-                    switch (board[pos.y][pos.x]) {
-                        case activePlayer:
-                        case BOX_STATES.EMPTY:
-                            return false;
+        _.map(DIRECTIONS, (dir, i) => {
 
-                        case getOtherPlayer(activePlayer):
-                            // It is an opposite 
-                            break;
+            let adj = dir(pos) // computing the adjacent in that direction
 
-                        default:
-                            console.log(board[pos.y][pos.x])
-                            break;
-                    }
+            if (isValidCoord(adj)) {
+                switch (board[adj.y][adj.x]) {
+                    // If either empty or the same color as active player, a move is not possible
+                    case activePlayer:
+                    case BOX_STATES.EMPTY:
+                        return 0;
 
-                    setActivePlayer(getOtherPlayer(activePlayer))
+                    // If a chip of the opposite color to the active player is present, it, or a series of that 
+                    // colored chips must be followed by a chip of the color of the player for the move to be valid
+                    case getOtherPlayer(activePlayer):
+                        while (board[adj.y][adj.x] == getOtherPlayer(activePlayer)) {
+                            adj = dir(adj)
+                        }
 
-                    // update checkers
+                        if ((board[adj.y][adj.x] == activePlayer) && isValidCoord(adj) && !isEmptyCoord(adj)) {
 
-                    console.log(outputCoord(adj), i, isValidCoord(adj))
+                            // returning back to the original adjacent to begin transformation
+                            adj = pos
+                            // adj = dir(pos)
+
+                            while (board[adj.y][adj.x] != activePlayer) {
+                                board[adj.y][adj.x] = activePlayer
+                                adj = dir(adj)
+                            }
+
+
+                        }
                 }
-            })
-        } else pushNotif("Invalid Square. Please click on a valid Square.")
+
+                setActivePlayer(getOtherPlayer(activePlayer))
+
+                // update checkers
+                console.log(outputCoord(adj), i, isValidCoord(adj))
+            }
+        })
+        //  pushNotif("Invalid Square. Please click on a valid Square.")
 
     }
 
@@ -191,8 +195,8 @@ const App = () => {
                         <div key={y} className="row">
                             {col.map((cell, x) =>
                                 <div key={x} className="cell">
-                                    <div className={`cont state-${cell.toLowerCase()}${isValidMove({ x, y }) ? ' isValidMove' : ''}`} onClick={() => runMove({ x, y })}>
-                                        {outputCoord({ x, y })}
+                                    <div className={`cont state-${cell.toLowerCase()} ${isValidMove({ x, y }) ? ' isValidMove highlight-' + activePlayer.toLocaleLowerCase() : ''}`} onClick={() => (isValidMove({ x, y }) && runMove({ x, y }))}>
+                                        {/* {outputCoord({ x, y })} */}
                                     </div>
                                 </div>
                             )}
