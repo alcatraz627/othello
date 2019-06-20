@@ -6,8 +6,12 @@ body {
     margin: 0;
 }
 
-.title {
+.center {
     text-align: center;
+}
+
+.bold {
+    font-weight: 700;
 }
 
 .square {
@@ -26,7 +30,6 @@ body {
         display: flex;
 
         .cell {
-
             position: relative;
             width: 50%;
             margin: 10px;
@@ -44,15 +47,17 @@ body {
                 height: $size;
 
                 text-align: center;
+
             }
 
             &:after {
                 content: "";
                 display: block;
                 padding-bottom: 100%;
+                
             }
 
-            .state-empty {
+            .state-empty.isValidMove {
                 &:hover {
                     background-color: gray;
                     cursor: pointer;
