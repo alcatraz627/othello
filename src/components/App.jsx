@@ -1,7 +1,14 @@
 import React, { useState } from 'react'
 import _ from 'lodash'
 
-const DIMENSION = 8
+
+// TODO: Add logging -> time travelling
+// TODO: Networking with WebRTC, startign games on a chatroom
+// TODO: UI and Animations
+// TODO: Save and load a game state to an from a JSON file
+// TODO(Maybe): Leaderboard of all games on a central server
+
+const DIMENSION = 6
 
 const COLORS = {
     BLACK: 'BLACK',
@@ -50,7 +57,6 @@ const createBoard = () => {
 
 }
 
-
 const DIRECTIONS = {
     TOP: ({ x, y }) => ({ x: x, y: y - 1 }),
     BOTTOM: ({ x, y }) => ({ x: x, y: y + 1 }),
@@ -70,6 +76,11 @@ const App = () => {
 
     const [notif, setNotif] = useState("")
 
+    React.useEffect(() => {
+        console.log(board)
+    })
+
+
     const outputCoord = ({ x, y }) => `(${x + 1}, ${y + 1})` // For human reading
 
     const getOtherPlayer = player => player == COLORS.BLACK ? COLORS.WHITE : COLORS.BLACK; // The player waiting
@@ -78,6 +89,16 @@ const App = () => {
 
     const isEmptyCoord = ({ x, y }) => (board[y][x] == BOX_STATES.EMPTY) // Is it empty right now
 
+    const getChip = ({ x, y }) => board[y][x]
+
+    // TODO: Update the state via hook and not mutation
+    const setChip = ({ x, y, value }) => board[y][x] = value
+    // const setChip = ({ x, y, value }) => setBoard(Object.assign([...board], {[y]: [...board[y].slice(0, x), value, board[y].slice((x+1))]}))
+
+
+    const getTotalPieces = (boxState) => _.chain(board).map(e => _.countBy(e, i => i == boxState)).map(e => e.true).sum().value()
+
+    // TODO: On every board update, keep a counter of possible moves. If the current player has no possible moves, notify and switch to the other player.
     const isValidMove = (pos) => {
 
         // - search in each direction, and 'at least one' should satisfy the following
@@ -96,7 +117,7 @@ const App = () => {
 
                 // Check the first adjacent
                 if (isValidCoord(adj)) {
-                    switch (board[adj.y][adj.x]) {
+                    switch (getChip(adj)) {
                         // If either empty or the same color as active player, a move is not possible
                         case activePlayer:
                         case BOX_STATES.EMPTY:
@@ -105,11 +126,11 @@ const App = () => {
                         // If a chip of the opposite color to the active player is present, it, or a series of that 
                         // colored chips must be followed by a chip of the color of the player for the move to be valid
                         case getOtherPlayer(activePlayer):
-                            while (board[adj.y][adj.x] == getOtherPlayer(activePlayer)) {
+                            while (isValidCoord(adj) && !isEmptyCoord(adj) && getChip(adj) == getOtherPlayer(activePlayer)) {
                                 adj = dir(adj)
                             }
 
-                            return ((board[adj.y][adj.x] == activePlayer) && isValidCoord(adj) && !isEmptyCoord(adj)) ? 1 : 0
+                            return (isValidCoord(adj) && !isEmptyCoord(adj) && (getChip(adj) == activePlayer)) ? 1 : 0
                     }
                 }
 
@@ -129,7 +150,7 @@ const App = () => {
             let adj = dir(pos) // computing the adjacent in that direction
 
             if (isValidCoord(adj)) {
-                switch (board[adj.y][adj.x]) {
+                switch (getChip(adj)) {
                     // If either empty or the same color as active player, a move is not possible
                     case activePlayer:
                     case BOX_STATES.EMPTY:
@@ -138,18 +159,17 @@ const App = () => {
                     // If a chip of the opposite color to the active player is present, it, or a series of that 
                     // colored chips must be followed by a chip of the color of the player for the move to be valid
                     case getOtherPlayer(activePlayer):
-                        while (board[adj.y][adj.x] == getOtherPlayer(activePlayer)) {
+                        while (isValidCoord(adj) && !isEmptyCoord(adj) && getChip(adj) == getOtherPlayer(activePlayer)) {
                             adj = dir(adj)
                         }
 
-                        if ((board[adj.y][adj.x] == activePlayer) && isValidCoord(adj) && !isEmptyCoord(adj)) {
+                        if (isValidCoord(adj) && !isEmptyCoord(adj) && (getChip(adj) == activePlayer)) {
 
-                            // returning back to the original adjacent to begin transformation
+                            // returning back to the original adjacent to begin flippig chips
                             adj = pos
-                            // adj = dir(pos)
 
-                            while (board[adj.y][adj.x] != activePlayer) {
-                                board[adj.y][adj.x] = activePlayer
+                            while (getChip(adj) != activePlayer) {
+                                setChip({ ...adj, value: activePlayer })
                                 adj = dir(adj)
                             }
 
@@ -157,14 +177,24 @@ const App = () => {
                         }
                 }
 
-                setActivePlayer(getOtherPlayer(activePlayer))
 
-                // update checkers
-                console.log(outputCoord(adj), i, isValidCoord(adj))
             }
         })
+        setActivePlayer(getOtherPlayer(activePlayer))
         //  pushNotif("Invalid Square. Please click on a valid Square.")
 
+        checkIfWon()
+    }
+
+    const checkIfWon = () => {
+        if (!getTotalPieces(BOX_STATES.EMPTY)) {
+            setTimeout(() => {
+                let n_black = getTotalPieces(BOX_STATES.BLACK)
+                let n_white = getTotalPieces(BOX_STATES.WHITE)
+
+                alert("Winner is the color " + (n_black > n_white ? COLORS.BLACK : COLORS.WHITE).toLocaleLowerCase() + " by " + Math.abs(n_black - n_white) + " chips")
+            }, 2000)
+        }
     }
 
     const pushNotif = text => {
@@ -180,6 +210,18 @@ const App = () => {
             <div className="container text-center">
                 <div className="title center">Othello Game</div>
                 <div className="subtitle center bold">Turn: {activePlayer.toLocaleLowerCase()}</div>
+                <div className="level">
+                    <div className="level-item gap">
+                        <div className="button is-light">
+                            White: {getTotalPieces(BOX_STATES.WHITE)}
+                        </div>
+                    </div>
+                    <div className="level-item gap">
+                        <div className="button is-dark">
+                            Black: {getTotalPieces(BOX_STATES.BLACK)}
+                        </div>
+                    </div>
+                </div>
                 {notif.length > 0 &&
                     <div class="notification is-info">
                         {notif}
