@@ -8,7 +8,9 @@ import _ from 'lodash'
 // TODO: Save and load a game state to an from a JSON file
 // TODO(Maybe): Leaderboard of all games on a central server
 
-const DIMENSION = 6
+const DIMENSION = 4
+
+const DEBUG = false
 
 const COLORS = {
     BLACK: 'BLACK',
@@ -45,6 +47,47 @@ const INIT_POS = [
     },
 ]
 
+// const INIT_POS = [
+//     {
+//         x: 1,
+//         y: 2,
+//         color: COLORS.BLACK
+//     },
+//     {
+//         x: 1,
+//         y: 3,
+//         color: COLORS.BLACK
+//     },
+//     {
+//         x: 1,
+//         y: 4,
+//         color: COLORS.BLACK
+//     },
+//     {
+//         x: 1,
+//         y: 5,
+//         color: COLORS.BLACK
+//     },
+//     {
+//         x: 2,
+//         y: 3,
+//         color: COLORS.WHITE
+//     },
+//     {
+//         x: 2,
+//         y: 4,
+//         color: COLORS.WHITE
+//     },
+//     {
+//         x: 1,
+//         y: 6,
+//         color: COLORS.WHITE
+//     },
+// ]
+
+// Information shape of the moves to track
+const moveObj = (player, coins) => ({player, coins})
+
 const createBoard = () => {
     var INITIAL_BOARD = _.times(DIMENSION, () => (_.times(DIMENSION, () => BOX_STATES.EMPTY)));
 
@@ -58,26 +101,30 @@ const createBoard = () => {
 }
 
 const DIRECTIONS = {
+    TOP_LEFT: ({ x, y }) => ({ x: x - 1, y: y - 1 }),
     TOP: ({ x, y }) => ({ x: x, y: y - 1 }),
-    BOTTOM: ({ x, y }) => ({ x: x, y: y + 1 }),
-    LEFT: ({ x, y }) => ({ x: x - 1, y: y }),
+    TOP_RIGHT: ({ x, y }) => ({ x: x + 1, y: y - 1 }),
+
     RIGHT: ({ x, y }) => ({ x: x + 1, y: y }),
 
-    TOP_LEFT: ({ x, y }) => ({ x: x - 1, y: y - 1 }),
-    TOP_RIGHT: ({ x, y }) => ({ x: x + 1, y: y - 1 }),
-    BOTTOM_LEFT: ({ x, y }) => ({ x: x - 1, y: y + 1 }),
     BOTTOM_RIGHT: ({ x, y }) => ({ x: x + 1, y: y + 1 }),
+    BOTTOM: ({ x, y }) => ({ x: x, y: y + 1 }),
+    BOTTOM_LEFT: ({ x, y }) => ({ x: x - 1, y: y + 1 }),
+
+    LEFT: ({ x, y }) => ({ x: x - 1, y: y }),
 
 }
 
 const App = () => {
     const [board, setBoard] = useState(createBoard())
     const [activePlayer, setActivePlayer] = useState(COLORS.BLACK)
-
+    
     const [notif, setNotif] = useState("")
 
+    const [moveHistory, setMoveHistory] = useState([])
+
     React.useEffect(() => {
-        console.log(board)
+        DEBUG && console.log(board)
     })
 
 
@@ -95,12 +142,12 @@ const App = () => {
     const setChip = ({ x, y, value }) => board[y][x] = value
     // const setChip = ({ x, y, value }) => setBoard(Object.assign([...board], {[y]: [...board[y].slice(0, x), value, board[y].slice((x+1))]}))
 
+    // Record move history
+    const pushMove = coins => {setMoveHistory([...moveHistory, moveObj(activePlayer, coins)])}
 
     const getTotalPieces = (boxState) => _.chain(board).map(e => _.countBy(e, i => i == boxState)).map(e => e.true).sum().value()
 
-    // TODO: On every board update, keep a counter of possible moves. If the current player has no possible moves, notify and switch to the other player.
-    const isValidMove = (pos) => {
-
+    const findValidDirs = (pos) => {
         // - search in each direction, and 'at least one' should satisfy the following
         // - adjacent cell should have a chip of the opposite color
         // - the next adjacent cell in the same direction should either be :
@@ -108,80 +155,67 @@ const App = () => {
         // 2) A chip of different color, and the search terminates, returning true.
         // 3) If it is either a) a wall, or b) an empty, the search terminates and returns false
 
-
-        if (isValidCoord(pos) && isEmptyCoord(pos)) {
-
-            let validDirections = _.map(DIRECTIONS, (dir, i) => {
-
-                let adj = dir(pos) // computing the adjacent in that direction
-
-                // Check the first adjacent
-                if (isValidCoord(adj)) {
-                    switch (getChip(adj)) {
-                        // If either empty or the same color as active player, a move is not possible
-                        case activePlayer:
-                        case BOX_STATES.EMPTY:
-                            return 0;
-
-                        // If a chip of the opposite color to the active player is present, it, or a series of that 
-                        // colored chips must be followed by a chip of the color of the player for the move to be valid
-                        case getOtherPlayer(activePlayer):
-                            while (isValidCoord(adj) && !isEmptyCoord(adj) && getChip(adj) == getOtherPlayer(activePlayer)) {
-                                adj = dir(adj)
-                            }
-
-                            return (isValidCoord(adj) && !isEmptyCoord(adj) && (getChip(adj) == activePlayer)) ? 1 : 0
-                    }
-                }
-
-            })
-
-            return (_.sum(validDirections) > 0)
-        }
-
-        return false
-        // check if piece at X, Y by player activePlayer can be placed. 
-    }
-
-    const runMove = (pos) => {
-
-        _.map(DIRECTIONS, (dir, i) => {
+        return _.map(DIRECTIONS, (dir, i) => {
 
             let adj = dir(pos) // computing the adjacent in that direction
 
-            if (isValidCoord(adj)) {
-                switch (getChip(adj)) {
-                    // If either empty or the same color as active player, a move is not possible
-                    case activePlayer:
-                    case BOX_STATES.EMPTY:
-                        return 0;
-
-                    // If a chip of the opposite color to the active player is present, it, or a series of that 
-                    // colored chips must be followed by a chip of the color of the player for the move to be valid
-                    case getOtherPlayer(activePlayer):
-                        while (isValidCoord(adj) && !isEmptyCoord(adj) && getChip(adj) == getOtherPlayer(activePlayer)) {
-                            adj = dir(adj)
-                        }
-
-                        if (isValidCoord(adj) && !isEmptyCoord(adj) && (getChip(adj) == activePlayer)) {
-
-                            // returning back to the original adjacent to begin flippig chips
-                            adj = pos
-
-                            while (getChip(adj) != activePlayer) {
-                                setChip({ ...adj, value: activePlayer })
-                                adj = dir(adj)
-                            }
-
-
-                        }
+            // Check the first adjacent
+            if (isValidCoord(adj) && getChip(adj) == getOtherPlayer(activePlayer)) {
+                // If a chip of the opposite color to the active player is present, it, or a series of that 
+                // colored chips must be followed by a chip of the color of the player for the move to be valid
+                while (isValidCoord(adj) && !isEmptyCoord(adj) && getChip(adj) == getOtherPlayer(activePlayer)) {
+                    adj = dir(adj)
                 }
+                return (isValidCoord(adj) && !isEmptyCoord(adj) && (getChip(adj) == activePlayer)) ? 1 : 0
+            } else return false
+        })
 
+    }
+    // TODO: On every board update, keep a counter of possible moves. If the current player has no possible moves, notify and switch to the other player.
+    const isValidMove = (pos) => {
+        if (isValidCoord(pos) && isEmptyCoord(pos)) {
+            // To track all the available directions to convert. Follows the same ordering as DIRECTIONS
+            let validDirections = findValidDirs(pos)
+            // console.log(`${JSON.stringify(pos)}-> ${JSON.stringify(validDirections)} | ${_.sum(validDirections)}`);
+            return (_.sum(validDirections) > 0)
+        }
+        return false
+    }
 
+    const runMove = (pos) => {
+        let coinsToFlip = [];
+
+        // Fetch the directions of available flips, assuming that a direction exists for this function to be enabled callind
+        let availableDirs = findValidDirs(pos)
+            .map((e, i) => (i + 1) * e)
+            .filter((e, i) => e)
+            .map(e => e - 1)
+
+        // Queue the clicked square for flipping
+        setChip({ ...pos, value: activePlayer })
+
+        _.map(availableDirs, (d, i) => {
+            // Fetch direction functor for available directions
+            let dir = Object.values(DIRECTIONS)[d]
+            // let oppdir_i = (i + 4) % 8 // Opposite of current direction, to prevent it from scanning backwards
+            let adj = dir(pos) // computing the adjacent in that direction
+
+            if (isValidCoord(adj) && getChip(adj) == getOtherPlayer(activePlayer)) {
+                // If a chip of the opposite color to the active player is present, it, or a series of that 
+                // colored chips must be followed by a chip of the color of the player for the move to be valid
+                // Keep flipping till appropriate
+                while (isValidCoord(adj) && !isEmptyCoord(adj) && getChip(adj) == getOtherPlayer(activePlayer)) {
+                    coinsToFlip.push(adj)
+                    adj = dir(adj) // iterator
+                }
             }
         })
+
+        // Flip all coins added to list
+        coinsToFlip.map(coord => {setChip({ ...coord, value: activePlayer })} ) 
+        pushMove(coinsToFlip) // Push to history
+
         setActivePlayer(getOtherPlayer(activePlayer))
-        //  pushNotif("Invalid Square. Please click on a valid Square.")
 
         checkIfWon()
     }
@@ -192,8 +226,8 @@ const App = () => {
                 let n_black = getTotalPieces(BOX_STATES.BLACK)
                 let n_white = getTotalPieces(BOX_STATES.WHITE)
 
-                alert("Winner is the color " + (n_black > n_white ? COLORS.BLACK : COLORS.WHITE).toLocaleLowerCase() + " by " + Math.abs(n_black - n_white) + " chips")
-            }, 2000)
+                pushNotif("Winner is the color " + (n_black > n_white ? COLORS.BLACK : COLORS.WHITE).toLocaleLowerCase() + " by " + Math.abs(n_black - n_white) + " chips")
+            }, 1000)
         }
     }
 
@@ -201,31 +235,42 @@ const App = () => {
         setNotif(text)
         setTimeout(() => {
             setNotif("")
-        }, 2000)
+        }, 5000)
     }
 
     return (
 
         <div className="section">
             <div className="container text-center">
-                <div className="title center">Othello Game</div>
-                <div className="subtitle center bold">Turn: {activePlayer.toLocaleLowerCase()}</div>
-                <div className="level">
-                    <div className="level-item gap">
-                        <div className="button is-light">
-                            White: {getTotalPieces(BOX_STATES.WHITE)}
+
+                <div className="columns">
+                    <div className="column level level-left">
+                        <div className="title left">Othello Game</div>
+                        <div className={`subtitle left bold`}>Turn: &nbsp;&nbsp;
+                            <div className={`button is-small is-${activePlayer.toLocaleLowerCase() == 'black' ? 'dark' : 'light'}`}>
+                                {activePlayer.toLocaleLowerCase()}</div>
                         </div>
                     </div>
-                    <div className="level-item gap">
-                        <div className="button is-dark">
-                            Black: {getTotalPieces(BOX_STATES.BLACK)}
+
+                    {/* <div className="column level level-right"> */}
+
+                    <div className="level-right">
+                        <div className="button score is-light">
+                            {getTotalPieces(BOX_STATES.WHITE)}
                         </div>
+
+                        <div className="button score is-dark">
+                            {getTotalPieces(BOX_STATES.BLACK)}
+                        </div>
+
                     </div>
+                    {/* </div> */}
+
                 </div>
                 {notif.length > 0 &&
-                    <div class="notification is-info">
+                    <div className="notification is-info">
                         {notif}
-                        <button class="delete" onClick={() => { setNotif("") }}></button>
+                        <button className="delete" onClick={() => { setNotif("") }}></button>
                     </div>
                 }
 
@@ -238,12 +283,20 @@ const App = () => {
                             {col.map((cell, x) =>
                                 <div key={x} className="cell">
                                     <div className={`cont state-${cell.toLowerCase()} ${isValidMove({ x, y }) ? ' isValidMove highlight-' + activePlayer.toLocaleLowerCase() : ''}`} onClick={() => (isValidMove({ x, y }) && runMove({ x, y }))}>
-                                        {/* {outputCoord({ x, y })} */}
+                                        {outputCoord({ x, y })}
                                     </div>
                                 </div>
                             )}
                         </div>
                     )}
+                </div>
+                <hr />
+                <div>
+                    {moveHistory.map((e, i) => <div key={i} className={`card history has-background-${e.player == COLORS.BLACK ? 'dark' : 'light'}`}>
+                        <div className={`has-text-${e.player == COLORS.BLACK ? 'light' : 'dark'}`}>
+                        {e.player} clicked on {outputCoord(e.coins[0])}
+                        </div>
+                    </div>)}
                 </div>
             </div>
         </div>
